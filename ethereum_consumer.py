@@ -4,7 +4,7 @@ from pyspark.sql.types import StructType, StringType, DoubleType, LongType, Time
 
 # Create a SparkSession
 spark = SparkSession.builder \
-    .appName("BitcoinPriceAnalyzer") \
+    .appName("ethereumPriceAnalyzer") \
     .getOrCreate()
 
 # Define the schema for the Kafka messages
@@ -27,7 +27,7 @@ kafka_df = spark \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "bitcoin") \
+    .option("subscribe", "ethereum") \
     .load()
 
 # Convert value column to string and parse JSON
