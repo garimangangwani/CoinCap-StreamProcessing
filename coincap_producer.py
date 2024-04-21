@@ -1,61 +1,51 @@
 from kafka import KafkaProducer
 import requests
+import json
 import time
-from json import dumps
 
-# Define the Kafka broker address and topics
+# Define the Kafka broker address
 bootstrap_servers = 'localhost:9092'
-topic1 = 'topic1'
-topic2 = 'topic2'
-topic3 = 'topic3'
+
+# Define the URLs and corresponding topics
+urls = {
+    'https://api.coincap.io/v2/assets/bitcoin': 'bitcoin_data',
+    'https://api.coincap.io/v2/assets/ethereum': 'ethereum_data',
+    'https://api.coincap.io/v2/assets/dogecoin': 'dogecoin_data'
+}
 
 # Create a Kafka producer
 producer = KafkaProducer(bootstrap_servers=bootstrap_servers,
-                         value_serializer=lambda v: dumps(v).encode('utf-8'))
+                         value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
-def get_crypto_assets():
-    # Define the API endpoint
-    url = 'https://api.coincap.io/v2/assets/bitcoin'
-
+def fetch_and_publish_data():
     while True:
         try:
-            # Send GET request to the API endpoint
-            response = requests.get(url)
+            # Iterate over the URLs and corresponding topics
+            for url, topic in urls.items():
+                # Send GET request to the API endpoint
+                response = requests.get(url)
 
-            # Check if the request was successful (status code 200)
-            if response.status_code == 200:
-                # Parse JSON response
-                data = response.json()
-                for i in range(3):
-                    # Extract all attributes
-                    all_attributes = data['data'][0]
-                    all_attributes['asset_rank'] = all_attributes.pop('rank')
+                # Check if the request was successful (status code 200)
+                if response.status_code == 200:
+                    # Parse JSON response
+                    data = response.json()
 
-                    # Publish all attributes to topic1
-                    print("All Attributes\n",all_attributes)
-                    producer.send(topic1, value=all_attributes)
-                
-                    # Publish subset of attributes to topic2
-                    subset1 = {k: all_attributes[k] for k in ("id", "symbol", "name", "supply", "maxSupply", "marketCapUsd")}
-                    print("\n\nSubset 1\n",subset1)
-                    producer.send(topic2, value=subset1)
+                    # Publish data to Kafka topic
+                    producer.send(topic, value=data)
 
-                    # Publish rest of the attributes to topic3
-                    subset2 = {k: all_attributes[k] for k in ("id","name","volumeUsd24Hr", "priceUsd", "changePercent24Hr", "vwap24Hr")}
-                    print("\n\nSubset 2\n",subset2)
-                    producer.send(topic3, value=subset2)
+                    print(f"Data published to Kafka topic {topic}: {data}")
 
-            else:
-                # Print error message if request was not successful
-                print(f"Error: {response.status_code}")
+                else:
+                    # Print error message if request was not successful
+                    print(f"Error: {response.status_code}")
 
         except Exception as e:
             # Print error message if an exception occurs
             print(f"Error: {e}")
 
-        # Wait for 1 second before making the next request
+        # Wait for 5 seconds before making the next request
         time.sleep(5)
 
-# Call the function to get crypto assets
-get_crypto_assets()
+# Call the function to fetch and publish data
+fetch_and_publish_data()
 
