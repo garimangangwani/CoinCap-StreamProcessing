@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
-from pyspark.sql.types import StructType, StringType, DoubleType, LongType
+from pyspark.sql.functions import from_json, col, window
+from pyspark.sql.types import StructType, StringType, DoubleType, LongType, TimestampType
 
 # Create a SparkSession
 spark = SparkSession.builder \
@@ -34,11 +34,19 @@ kafka_df = spark \
 parsed_df = kafka_df \
     .selectExpr("CAST(value AS STRING)") \
     .select(from_json("value", schema).alias("data")) \
-    .select("data.*")
+    .select("data.*") \
+    .withColumn("timestamp", col("timestamp").cast(TimestampType())) # Convert timestamp column to TIMESTAMP type
 
-# Print the value column
-query = parsed_df.writeStream \
-    .outputMode("append") \
+# Apply window operation to calculate average price over 1-hour window
+windowed_df = parsed_df \
+    .withWatermark("timestamp", "1 hour") \
+    .groupBy(window("timestamp", "1 hour")) \
+    .agg({"priceUsd": "avg"})
+
+# Write the aggregated data to the console
+query = windowed_df \
+    .writeStream \
+    .outputMode("complete") \
     .format("console") \
     .start()
 
