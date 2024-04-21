@@ -36,10 +36,14 @@ def fetch_and_publish_data():
                 if response.status_code == 200:
                     # Parse JSON response
                     data = response.json()['data']
-                    print(data)
+                    
+                    # Convert specific fields from string to float or double
+                    for key in ['supply', 'maxSupply', 'marketCapUsd', 'volumeUsd24Hr', 'priceUsd', 'changePercent24Hr', 'vwap24Hr']:
+                        if key in data and data[key] is not None:
+                            data[key] = float(data[key])
+
                     # Publish data to Kafka topic
                     producer.send(topic, value=data)
-
                     print(f"Data published to Kafka topic {topic}: {data}")
 
                 else:
