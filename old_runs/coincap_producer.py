@@ -3,9 +3,11 @@ import requests
 import time
 from json import dumps
 
-# Define the Kafka broker address and topic
+# Define the Kafka broker address and topics
 bootstrap_servers = 'localhost:9092'
-topic = 'crypto_assets'
+topic1 = 'topic1'
+topic2 = 'topic2'
+topic3 = 'topic3'
 
 # Create a Kafka producer
 producer = KafkaProducer(bootstrap_servers=bootstrap_servers,
@@ -25,27 +27,22 @@ def get_crypto_assets():
                 # Parse JSON response
                 data = response.json()
 
-                # Extract relevant data (e.g., asset names, symbols, prices, and timestamp)
-                assets = data['data']
-                timestamp = data['timestamp']
+                # Extract all attributes
+                all_attributes = data['data'][0]
+
+                # Publish all attributes to topic1
+                print("All Attributes\n",all_attributes)
+                producer.send(topic1, value=all_attributes)
                 
-                first_asset = data['data'][0]
-                timestamp = data['timestamp']
-                name = first_asset['name']
-                symbol = first_asset['symbol']
-                price = first_asset['priceUsd']
-                
-                # Create a dictionary containing the extracted data
-                asset_data = {
-                    'timestamp': timestamp,
-                    'name': name,
-                    'symbol': symbol,
-                    'price': price
-                }
-                
-                # Send the data to the Kafka topic
-                producer.send(topic, value=asset_data)
-                print("Sent to Kafka:", asset_data)
+                # Publish subset of attributes to topic2
+                subset1 = {k: all_attributes[k] for k in ("id", "rank", "symbol", "name", "supply", "maxSupply", "marketCapUsd")}
+                print("\n\nSubset 1\n",subset1)
+                producer.send(topic2, value=subset1)
+
+                # Publish rest of the attributes to topic3
+                subset2 = {k: all_attributes[k] for k in ("id","name","volumeUsd24Hr", "priceUsd", "changePercent24Hr", "vwap24Hr")}
+                print("\n\nSubset 2\n",subset2)
+                producer.send(topic3, value=subset2)
 
             else:
                 # Print error message if request was not successful
@@ -56,7 +53,7 @@ def get_crypto_assets():
             print(f"Error: {e}")
 
         # Wait for 1 second before making the next request
-        time.sleep(1)
+        time.sleep(5)
 
 # Call the function to get crypto assets
 get_crypto_assets()
