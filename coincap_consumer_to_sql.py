@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
-from pyspark.sql.types import StructType, StringType, DoubleType
+from pyspark.sql.functions import from_json
+from pyspark.sql.types import StructType, StringType, DoubleType , LongType
 
 # Create a SparkSession
 spark = SparkSession.builder \
@@ -9,32 +9,60 @@ spark = SparkSession.builder \
 
 # Define the schema for the Kafka messages
 schema = StructType() \
+    .add("timestamp", LongType()) \
     .add("id", StringType()) \
     .add("asset_rank", StringType()) \
     .add("symbol", StringType()) \
     .add("name", StringType()) \
-    .add("supply", StringType()) \
-    .add("maxSupply", StringType()) \
-    .add("marketCapUsd", StringType()) \
-    .add("volumeUsd24Hr", StringType()) \
-    .add("priceUsd", StringType()) \
-    .add("changePercent24Hr", StringType()) \
-    .add("vwap24Hr", StringType()) \
+    .add("supply", DoubleType()) \
+    .add("maxSupply", DoubleType()) \
+    .add("marketCapUsd", DoubleType()) \
+    .add("volumeUsd24Hr", DoubleType()) \
+    .add("priceUsd", DoubleType()) \
+    .add("changePercent24Hr", DoubleType()) \
+    .add("vwap24Hr", DoubleType()) \
     .add("explorer", StringType())
 
-# Read data from Kafka topic into a DataFrame
-kafka_df = spark \
+# Read data from Kafka topics into DataFrames
+kafka_df1 = spark \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "topic1") \
+    .option("subscribe", "bitcoin") \
     .load()
 
-# Convert value column to string and parse JSON
-parsed_df = kafka_df \
+kafka_df2 = spark \
+    .readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "ethereum") \
+    .load()
+
+kafka_df3 = spark \
+    .readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "dogecoin") \
+    .load()
+
+# Convert value column to string and parse JSON for all DataFrames
+parsed_df1 = kafka_df1 \
     .selectExpr("CAST(value AS STRING)") \
     .select(from_json("value", schema).alias("data")) \
     .select("data.*")
+
+parsed_df2 = kafka_df2 \
+    .selectExpr("CAST(value AS STRING)") \
+    .select(from_json("value", schema).alias("data")) \
+    .select("data.*")
+
+parsed_df3 = kafka_df3 \
+    .selectExpr("CAST(value AS STRING)") \
+    .select(from_json("value", schema).alias("data")) \
+    .select("data.*")
+
+# Union all three DataFrames
+union_df = parsed_df1.union(parsed_df2).union(parsed_df3)
 
 # Define function to insert DataFrame into MySQL table
 def insert_to_mysql(df, epoch_id):
@@ -52,7 +80,7 @@ def insert_to_mysql(df, epoch_id):
                   properties={"user": mysql_props["user"], "password": mysql_props["password"]})
 
 # Write the parsed data to the MySQL table
-query = parsed_df \
+query = union_df \
     .writeStream \
     .foreachBatch(insert_to_mysql) \
     .outputMode("append") \
