@@ -1,51 +1,47 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import window, avg, col
-from pyspark.sql.types import StructType
+from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import StructType, StringType, DoubleType, LongType
 
 # Create a SparkSession
 spark = SparkSession.builder \
-    .appName("BitcoinAveragePrice") \
+    .appName("BitcoinPriceAnalyzer") \
     .getOrCreate()
 
-# Define the schema for the incoming data
+# Define the schema for the Kafka messages
 schema = StructType() \
-    .add("id", "string") \
-    .add("rank", "string") \
-    .add("symbol", "string") \
-    .add("name", "string") \
-    .add("supply", "double") \
-    .add("maxSupply", "double") \
-    .add("marketCapUsd", "double") \
-    .add("volumeUsd24Hr", "double") \
-    .add("priceUsd", "double") \
-    .add("changePercent24Hr", "double") \
-    .add("vwap24Hr", "double")
+    .add("id", StringType()) \
+    .add("symbol", StringType()) \
+    .add("name", StringType()) \
+    .add("supply", DoubleType()) \
+    .add("maxSupply", DoubleType()) \
+    .add("marketCapUsd", DoubleType()) \
+    .add("volumeUsd24Hr", DoubleType()) \
+    .add("priceUsd", DoubleType()) \
+    .add("changePercent24Hr", DoubleType()) \
+    .add("vwap24Hr", DoubleType()) \
+    .add("explorer", StringType()) \
+    .add("timestamp", LongType())
 
 # Read data from Kafka topic into a DataFrame
-bitcoin_df = spark \
+kafka_df = spark \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
     .option("subscribe", "bitcoin") \
     .load()
 
-# Convert the value column from binary to string and parse JSON
-bitcoin_data = bitcoin_df \
+# Convert value column to string and parse JSON
+parsed_df = kafka_df \
     .selectExpr("CAST(value AS STRING)") \
-    .selectExpr("from_json(value, 'id STRING, rank STRING, symbol STRING, name STRING, supply DOUBLE, maxSupply DOUBLE, marketCapUsd DOUBLE, volumeUsd24Hr DOUBLE, priceUsd DOUBLE, changePercent24Hr DOUBLE, vwap24Hr DOUBLE') AS data") \
+    .select(from_json("value", schema).alias("data")) \
     .select("data.*")
 
-# Define a window of time (e.g., 1 hour)
-windowed_data = bitcoin_data \
-    .withWatermark("timestamp", "1 hour") \
-    .groupBy(window("timestamp", "1 hour")) \
-    .agg(avg(col("priceUsd")).alias("average_price"))
-
-# Start the streaming query to calculate the average price of Bitcoin
-query = windowed_data \
-    .writeStream \
-    .outputMode("complete") \
+# Print the value column
+query = parsed_df.writeStream \
+    .outputMode("append") \
     .format("console") \
     .start()
 
+# Wait for the streaming query to terminate
 query.awaitTermination()
+
