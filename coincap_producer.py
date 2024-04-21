@@ -1,16 +1,22 @@
+#python3 coincap_producer.py bitcoin ethereum dogecoin
 from kafka import KafkaProducer
 import requests
 import json
+import sys
 import time
 
 # Define the Kafka broker address
 bootstrap_servers = 'localhost:9092'
 
+coin1=sys.argv[1]
+coin2=sys.argv[2]
+coin3=sys.argv[3]
+
 # Define the URLs and corresponding topics
 urls = {
-    'https://api.coincap.io/v2/assets/bitcoin': 'bitcoin_data',
-    'https://api.coincap.io/v2/assets/ethereum': 'ethereum_data',
-    'https://api.coincap.io/v2/assets/dogecoin': 'dogecoin_data'
+    'https://api.coincap.io/v2/assets/'+coin1: coin1,
+    'https://api.coincap.io/v2/assets/'+coin2: coin2,
+    'https://api.coincap.io/v2/assets/'+coin3: coin3
 }
 
 # Create a Kafka producer
@@ -18,6 +24,7 @@ producer = KafkaProducer(bootstrap_servers=bootstrap_servers,
                          value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 def fetch_and_publish_data():
+    print("Topics:","\n",coin1,"\n",coin2,"\n",coin3,"\n")
     while True:
         try:
             # Iterate over the URLs and corresponding topics
@@ -28,8 +35,8 @@ def fetch_and_publish_data():
                 # Check if the request was successful (status code 200)
                 if response.status_code == 200:
                     # Parse JSON response
-                    data = response.json()
-
+                    data = response.json()['data']
+                    print(data)
                     # Publish data to Kafka topic
                     producer.send(topic, value=data)
 
