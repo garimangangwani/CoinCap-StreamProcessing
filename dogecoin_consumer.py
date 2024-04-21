@@ -39,8 +39,8 @@ parsed_df = kafka_df \
 
 # Apply window operation to calculate average price, total volume traded, and maximum price over 5-minute window
 windowed_df = parsed_df \
-    .withWatermark("timestamp", "5 minutes") \
-    .groupBy(window("timestamp", "5 minutes")) \
+    .withWatermark("timestamp", "2 minutes") \
+    .groupBy(window("timestamp", "2 minutes")) \
     .agg(avg("priceUsd").alias("avg_price_USD"), 
          sum("volumeUsd24Hr").alias("total_volume_USD"), 
          max("priceUsd").alias("max_price_USD"))
