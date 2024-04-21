@@ -1,25 +1,25 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window
-from pyspark.sql.types import StructType, StringType, DoubleType
+from pyspark.sql.functions import window, avg, col
+from pyspark.sql.types import StructType
 
 # Create a SparkSession
 spark = SparkSession.builder \
-    .appName("BitcoinAnalyzer") \
+    .appName("BitcoinAveragePrice") \
     .getOrCreate()
 
-# Define the schema for the Kafka messages
+# Define the schema for the incoming data
 schema = StructType() \
-    .add("id", StringType()) \
-    .add("rank", StringType()) \
-    .add("symbol", StringType()) \
-    .add("name", StringType()) \
-    .add("supply", StringType()) \
-    .add("maxSupply", StringType()) \
-    .add("marketCapUsd", StringType()) \
-    .add("volumeUsd24Hr", StringType()) \
-    .add("priceUsd", StringType()) \
-    .add("changePercent24Hr", StringType()) \
-    .add("vwap24Hr", StringType())
+    .add("id", "string") \
+    .add("rank", "string") \
+    .add("symbol", "string") \
+    .add("name", "string") \
+    .add("supply", "double") \
+    .add("maxSupply", "double") \
+    .add("marketCapUsd", "double") \
+    .add("volumeUsd24Hr", "double") \
+    .add("priceUsd", "double") \
+    .add("changePercent24Hr", "double") \
+    .add("vwap24Hr", "double")
 
 # Read data from Kafka topic into a DataFrame
 bitcoin_df = spark \
@@ -29,29 +29,23 @@ bitcoin_df = spark \
     .option("subscribe", "bitcoin") \
     .load()
 
-# Convert value column to string and parse JSON
-parsed_df = bitcoin_df \
+# Convert the value column from binary to string and parse JSON
+bitcoin_data = bitcoin_df \
     .selectExpr("CAST(value AS STRING)") \
-    .select(from_json("value", schema).alias("data")) \
+    .selectExpr("from_json(value, 'id STRING, rank STRING, symbol STRING, name STRING, supply DOUBLE, maxSupply DOUBLE, marketCapUsd DOUBLE, volumeUsd24Hr DOUBLE, priceUsd DOUBLE, changePercent24Hr DOUBLE, vwap24Hr DOUBLE') AS data") \
     .select("data.*")
 
-# Convert price to DoubleType
-parsed_df = parsed_df.withColumn("priceUsd", col("priceUsd").cast(DoubleType()))
+# Define a window of time (e.g., 1 hour)
+windowed_data = bitcoin_data \
+    .withWatermark("timestamp", "1 hour") \
+    .groupBy(window("timestamp", "1 hour")) \
+    .agg(avg(col("priceUsd")).alias("average_price"))
 
-# Define a window of 5 data points
-windowed_df = parsed_df \
-    .groupBy(window("id", "20 seconds")) \
-    .agg({"priceUsd": "avg", "priceUsd": "max"})
-
-# Start the streaming query
-query = windowed_df \
+# Start the streaming query to calculate the average price of Bitcoin
+query = windowed_data \
     .writeStream \
     .outputMode("complete") \
     .format("console") \
     .start()
 
-# Wait for the query to terminate
 query.awaitTermination()
-
-# Stop the SparkSession
-spark.stop()
