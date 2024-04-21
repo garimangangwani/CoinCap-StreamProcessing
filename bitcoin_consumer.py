@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window
+from pyspark.sql.functions import from_json, col, window, avg, sum, max
 from pyspark.sql.types import StructType, StringType, DoubleType, LongType, TimestampType
 
 # Create a SparkSession
@@ -37,17 +37,20 @@ parsed_df = kafka_df \
     .select("data.*") \
     .withColumn("timestamp", col("timestamp").cast(TimestampType())) # Convert timestamp column to TIMESTAMP type
 
-# Apply window operation to calculate average price over 1-hour window
+# Apply window operation to calculate average price, total volume traded, and maximum price over 5-minute window
 windowed_df = parsed_df \
-    .withWatermark("timestamp", "1 hour") \
-    .groupBy(window("timestamp", "1 hour")) \
-    .agg({"priceUsd": "avg"})
+    .withWatermark("timestamp", "5 minutes") \
+    .groupBy(window("timestamp", "5 minutes")) \
+    .agg(avg("priceUsd").alias("avg_price"), 
+         sum("volumeUsd24Hr").alias("total_volume"), 
+         max("priceUsd").alias("max_price"))
 
-# Write the aggregated data to the console
+# Write the aggregated data to the console with truncate=False
 query = windowed_df \
     .writeStream \
     .outputMode("complete") \
     .format("console") \
+    .option("truncate", False) \
     .start()
 
 # Wait for the streaming query to terminate

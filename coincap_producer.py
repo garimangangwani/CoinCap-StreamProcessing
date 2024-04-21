@@ -37,7 +37,6 @@ def fetch_and_publish_data():
                     # Parse JSON response
                     data = response.json()['data']
                     data["timestamp"] = int(response.json()['timestamp'])
-                    print(type(data["timestamp"]))
 
                     data["asset_rank"] = data.pop("rank")
                     # Convert specific fields from string to float or double
