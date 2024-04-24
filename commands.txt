@@ -1,0 +1,9 @@
+/opt/spark/sbin/start-all.sh
+systemctl start kafka
+python3 coincap_producer.py bitcoin ethereum dogecoin
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0     bitcoin_consumer.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0     dogecoin_consumer.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0     ethereum_consumer.py
+
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,mysql:mysql-connector-java:8.0.27 coincap_consumer_to_sql.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,mysql:mysql-connector-java:8.0.27 batch_processing.py

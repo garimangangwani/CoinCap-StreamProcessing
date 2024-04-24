@@ -11,7 +11,7 @@ spark = SparkSession.builder \
 # Define MySQL connection properties
 mysql_props = {
     "url": "jdbc:mysql://localhost:3306/coincap",
-    "user": "hemanth",
+    "user": "gariman",
     "password": "",
 }
 

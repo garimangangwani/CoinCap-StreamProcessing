@@ -69,7 +69,7 @@ def insert_to_mysql(df, epoch_id):
     # Define MySQL connection properties
     mysql_props = {
         "url": "jdbc:mysql://localhost:3306/coincap",
-        "user": "hemanth",
+        "user": "gariman",
         "password": "",
         "dbtable": "crypto_assets"
     }
